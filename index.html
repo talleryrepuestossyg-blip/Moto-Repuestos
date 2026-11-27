@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MotoRepuestos - SICAJAU</title>
+  <script src="https://jsdelivr.net"></script>
+  <style>
+    * { box-sizing: border-box; font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; }
+    body { background: #f4f5f7; color: #222; padding-bottom: 100px; }
+    header { background: #121212; color: #fff; padding: 1.4rem 1rem; text-align: center; border-bottom: 4px solid #e63946; }
+    header h1 { color: #e63946; font-size: 1.6rem; margin-bottom: 0.3rem; }
+    header p { color: #ccc; font-size: 0.9rem; }
+    .aviso { background: #ffd166; color: #111; text-align: center; padding: 0.5rem; font-size: 0.85rem; font-weight: bold; }
+    .filtros { padding: 1rem; text-align: center; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.08); position: sticky; top: 0; z-index: 10; }
+    .filtros input, .filtros select { padding: 0.7rem; margin: 0.3rem; border: 1px solid #ccc; border-radius: 6px; width: 260px; font-size: 0.95rem; }
+    .info-resultados { text-align: center; margin-top: 1rem; color: #555; font-size: 0.9rem; font-weight: 500; padding: 0 1rem; }
+    .contenedor { max-width: 1150px; margin: 1rem auto; padding: 0 1rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; }
+    .producto { background: #fff; padding: 1rem; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.07); display: flex; flex-direction: column; justify-content: space-between; border-top: 3px solid #e63946; }
+    .producto img { width: 100%; height: 180px; object-fit: contain; background: #fff; border-radius: 6px; margin-bottom: 0.8rem; border: 1px solid #eee; padding: 4px; }
+    .codigo { color: #e63946; font-weight: bold; font-size: 0.82rem; margin-bottom: 0.3rem; }
+    .producto h3 { font-size: 0.98rem; margin-bottom: 0.7rem; line-height: 1.35; color: #111; }
+    .cat-tag { background: #edf2f4; color: #2b2d42; font-size: 0.75rem; padding: 4px 9px; border-radius: 4px; width: fit-content; margin-bottom: 0.9rem; font-weight: 600; }
+    button { background: #1a1a1a; color: #fff; border: none; padding: 0.7rem; border-radius: 6px; cursor: pointer; font-weight: bold; width: 100%; font-size: 0.9rem; }
+    button:hover { background: #e63946; }
+    #barra-cotizar { position: fixed; bottom: 0; left: 0; width: 100%; background: #fff; border-top: 3px solid #25D366; padding: 0.8rem; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0.6rem; box-shadow: 0 -3px 12px rgba(0,0,0,0.15); z-index: 20; }
+    #dato-moto { padding: 0.7rem; border: 1px solid #999; border-radius: 6px; width: 270px; font-size: 0.9rem; }
+    #btn-wa { background: #25D366; color: #fff; width: auto; padding: 0.7rem 1.4rem; }
+    #btn-limpiar { background: #6c757d; color: #fff; width: auto; padding: 0.7rem 1rem; }
+  </style>
+</head>
+<body>
+
+<div class="aviso">
+  🚚 Envíos a toda Guatemala | Consulta disponibilidad y precio directo por WhatsApp
+</div>
+
+<header>
+  <h1>🏍️ MotoRepuestos - SICAJAU</h1>
+  <p>Busca por modelo de moto o nombre de pieza y arma tu cotización</p>
+</header>
+
+<div class="filtros">
+  <input type="text" id="buscador" placeholder="Ej. GN125, Pulsar, CGL125, carburador..." oninput="filtrarConPausa()">
+  <select id="categoria" onchange="filtrar()">
+    <option value="todos">Todas las categorías</option>
+  </select>
+</div>
+
+<div class="info-resultados" id="contador-resultados">Cargando repuestos con fotos...</div>
+<div class="contenedor" id="lista-productos"></div>
+
+<div id="barra-cotizar">
+  <input type="text" id="dato-moto" placeholder="Marca, modelo y año de tu moto (Ej. GN125 2022)">
+  <button id="btn-wa" onclick="enviarWhatsApp()">
+    📲 Cotizar piezas (<span id="contador">0</span>)
+  </button>
+  <button id="btn-limpiar" onclick="limpiarLista()" title="Vaciar lista">🗑️ Vaciar</button>
+</div>
+
+<script>
+  // RECUERDA PONER TU NÚMERO DE WHATSAPP Y TÍTULO DE TIENDA SI YA LOS HABÍAS CAMBIADO:
+  const telefonoTienda = "50231846613"; 
+  const csvUrl = "https://google.com";
+  const imagenRespaldo = "https://placehold.co";
+
+  let productos = [];
+  let listaCotizacion = [];
+
+  function iniciar() {
+    Papa.parse(csvUrl, {
+      download: true,
+      header: true,
+      skipEmptyLines: true,
+      complete: function(results) {
+        const categoriasUnicas = new Set();
+        const codigosVistos = new Set();
+
+        productos = results.data.map(fila => {
+          const cod = (fila.Codigo || "").trim();
+          const nom = (fila.Nombre || "").trim();
+          const cat = (fila.Categoria || "").trim();
+          // Lee la columna sin importar si se llama FOTO, Foto o foto
+          const fot = (fila.FOTO || fila.Foto || fila.foto || "").trim();
+
+          if (cod && nom && !codigosVistos.has(cod)) {
+            codigosVistos.add(cod);
+            if (cat) categoriasUnicas.add(cat);
+            return { codigo: cod, nombre: nom, categoria: cat, foto: fot || imagenRespaldo };
+          }
+          return null;
+        }).filter(Boolean);
+
+        const selectCat = document.getElementById("categoria");
+        Array.from(categoriasUnicas).sort()
+          .forEach(c => {
+            selectCat.innerHTML += `<option value="${escaparHTML(c)}">${escaparHTML(c)}</option>`;
+          });
+
+        mostrarProductos(productos.slice(0, 60));
+        document.getElementById("contador-resultados").innerText = 
+          `Mostrando ${Math.min(60, productos.length)} de ${productos.length} repuestos disponibles (usa el buscador o filtro para ver más)`;
+      },
+      error: function() {
+        document.getElementById("contador-resultados").innerHTML = 
+          "⚠️ Error al leer el archivo CSV. Abre la página desde tu enlace de <b>Netlify</b>.";
+      }
+    });
+  }
+
+  function escaparHTML(texto) {
+    return String(texto).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  function mostrarProductos(lista) {
+    document.getElementById("lista-productos").innerHTML = lista.map(p => `
+        <div class="producto">
+          <div>
+            <img src="${escaparHTML(p.foto)}" alt="${escaparHTML(p.nombre)}" loading="lazy" onerror="this.src='${imagenRespaldo}'">
+            <div class="codigo">Cód: ${escaparHTML(p.codigo)}</div>
+            <h3>${escaparHTML(p.nombre)}</h3>
+            <div class="cat-tag">${escaparHTML(p.categoria)}</div>
+          </div>
+          <button data-codigo="${escaparHTML(p.codigo)}">+ Agregar a cotización</button>
+        </div>
+      `).join("");
+  }
+
+  document.getElementById("lista-productos").addEventListener("click", e => {
+    const boton = e.target.closest("button[data-codigo]");
+    if (boton) agregar(boton.dataset.codigo);
+  });
+
+  let pausaBusqueda;
+  function filtrarConPausa() {
+    clearTimeout(pausaBusqueda);
+    pausaBusqueda = setTimeout(filtrar, 200);
+  }
+
+  function filtrar() {
+    const texto = document.getElementById("buscador").value.toLowerCase();
+    const cat = document.getElementById("categoria").value;
+    const filtrados = productos.filter(p => 
+      (cat === "todos" || p.categoria === cat) &&
+      (p.nombre.toLowerCase().includes(texto) || p.codigo.toLowerCase().includes(texto))
+    );
+    mostrarProductos(filtrados.slice(0, 120));
+    document.getElementById("contador-resultados").innerText = 
+      `Se encontraron ${filtrados.length} repuestos` + (filtrados.length > 120 ? " (mostrando los primeros 120)" : "");
+  }
+
+  function agregar(codigo) {
+    const item = productos.find(p => p.codigo === codigo);
+    if (item) {
+      listaCotizacion.push(item);
+      document.getElementById("contador").innerText = listaCotizacion.length;
+    }
+  }
+
+  function limpiarLista() {
+    listaCotizacion = [];
+    document.getElementById("contador").innerText = "0";
+  }
+
+  function enviarWhatsApp() {
+    const moto = document.getElementById("dato-moto").value.trim();
+    if (listaCotizacion.length === 0) return alert("Agrega al menos un repuesto a tu lista.");
+    if (moto === "") return alert("Por favor escribe la marca, modelo y año de tu moto.");
+
+    let mensaje = `Hola, me gustaría cotizar precio y disponibilidad de estos repuestos:\n\n`;
+    mensaje += `*Moto:* ${moto}\n\n`;
+    listaCotizacion.forEach(p => mensaje += `• [${p.codigo}] ${p.nombre}\n`);
+    
+    window.open(`https://wa.me{telefonoTienda}?text=${encodeURIComponent(mensaje)}`, "_blank");
+  }
+
+  iniciar();
+</script>
+</body>
+</html>
